@@ -54,6 +54,7 @@ public:
     void insert(double value) { root = insert(root, value); }
     void remove(double value) { root = remove(root, value); }
     bool search(double value) { return search(root, value) != nullptr; }
+    BSTNode* getRoot() { return root; }
 };
 
 // AVL树类
@@ -77,6 +78,7 @@ public:
     void insert(double value) { root = insert(root, value); }
     void remove(double value) { root = remove(root, value); }
     bool search(double value) { return search(root, value) != nullptr; }
+    AVLNode* getRoot() { return root; }
 };
 
 // 红黑树类
@@ -90,7 +92,7 @@ private:
     void insertFixup(RBNode* z);
     void deleteFixup(RBNode* x);
     void transplant(RBNode* u, RBNode* v);
-    RBNode* minimum(RBNode* node);
+    RBNode* minimum(RBNode* node);//最小值
     RBNode* search(RBNode* node, double value);
     void cleanup(RBNode* node);
     
@@ -101,26 +103,34 @@ public:
     void insert(double value);
     void remove(double value);
     bool search(double value);
+    RBNode* getRoot() { return root; }
 };
 
 // B树类
 class BTree {
 private:
     BTreeNode* root;
-    int t;  // 最小度数
+    int M;  // 阶数，一个节点最多可以有M个子节点，M-1个键
     
     void splitChild(BTreeNode* x, int i);
     void insertNonFull(BTreeNode* x, double k);
     bool searchInternal(BTreeNode* x, double k);
     void cleanup(BTreeNode* node);
+    void removeInternal(BTreeNode* node, double value);
+    double getPredecessor(BTreeNode* node);
+    double getSuccessor(BTreeNode* node);
+    void merge(BTreeNode* parent, int idx);
+    void borrowFromLeft(BTreeNode* parent, int idx);
+    void borrowFromRight(BTreeNode* parent, int idx);
     
 public:
-    BTree(int degree) : root(nullptr), t(degree) {}
+    BTree(int order) : root(nullptr), M(order) {}
     ~BTree() { cleanup(root); }
     
     void insert(double value);
     void remove(double value);
     bool search(double value);
+    BTreeNode* getRoot() { return root; }
 };
 
 // BST实现
@@ -165,22 +175,29 @@ BSTNode* BSTree::remove(BSTNode* node, double value) {
     } else if (value > node->value) {
         node->right = remove(node->right, value);
     } else {
-        if (node->left == nullptr) {
+        if (node->left == nullptr) {//左子树为空，右子树代替(包括了左右子树都为空的情况)
             BSTNode* temp = node->right;
             delete node;
             return temp;
-        } else if (node->right == nullptr) {
+        } else if (node->right == nullptr) {//右子树为空，左子树代替(包括了左右子树都为空的情况)
             BSTNode* temp = node->left;
             delete node;
             return temp;
         }
-        
+        //找到右子树中的最小值
         BSTNode* temp = node->right;
         while (temp->left != nullptr) {
             temp = temp->left;
         }
         node->value = temp->value;
         node->right = remove(node->right, temp->value);
+        //找到左子树中的最大值
+        // BSTNode* temp = node->left;
+        // while (temp->right != nullptr) {
+        //     temp = temp->right;
+        // }
+        // node->value = temp->value;
+        // node->left = remove(node->left, temp->value);
     }
     return node;
 }
@@ -197,12 +214,12 @@ int AVLTree::getBalance(AVLNode* node) {
 }
 
 AVLNode* AVLTree::rightRotate(AVLNode* y) {
-    AVLNode* x = y->left;
-    AVLNode* T2 = x->right;
+    AVLNode* x = y->left;//失衡节点的左子树
+    AVLNode* T2 = x->right;//如果冲突需要调整的节点
     
     x->right = y;
-    y->left = T2;
-    
+    y->left = T2;//冲突的右子树变为失衡节点的左子树
+    //只会影响x,y的高度,更新高度
     y->height = std::max(height(y->left), height(y->right)) + 1;
     x->height = std::max(height(x->left), height(x->right)) + 1;
     
@@ -210,12 +227,12 @@ AVLNode* AVLTree::rightRotate(AVLNode* y) {
 }
 
 AVLNode* AVLTree::leftRotate(AVLNode* x) {
-    AVLNode* y = x->right;
-    AVLNode* T2 = y->left;
+    AVLNode* y = x->right;//失衡节点的右子树
+    AVLNode* T2 = y->left;//如果冲突需要调整的节点
     
     y->left = x;
-    x->right = T2;
-    
+    x->right = T2;//冲突的左子树变为失衡节点的右子树
+    //只会影响x,y的高度,更新高度
     x->height = std::max(height(x->left), height(x->right)) + 1;
     y->height = std::max(height(y->left), height(y->right)) + 1;
     
@@ -249,13 +266,13 @@ AVLNode* AVLTree::insert(AVLNode* node, double value) {
         return leftRotate(node);
     }
     
-    // 左右情况
+    // 左右情况：插入节点位置在失衡节点的左子树的右子树上
     if (balance > 1 && value > node->left->value) {
         node->left = leftRotate(node->left);
         return rightRotate(node);
     }
     
-    // 右左情况
+    // 右左情况：插入节点位置在失衡节点的右子树的左子树上
     if (balance < -1 && value < node->right->value) {
         node->right = rightRotate(node->right);
         return leftRotate(node);
@@ -281,6 +298,73 @@ void AVLTree::cleanup(AVLNode* node) {
         cleanup(node->right);
         delete node;
     }
+}
+
+// AVL树删除实现
+AVLNode* AVLTree::remove(AVLNode* node, double value) {
+    if (node == nullptr) return nullptr;
+    
+    if (value < node->value) {
+        node->left = remove(node->left, value);
+    } else if (value > node->value) {
+        node->right = remove(node->right, value);
+    } else {
+        if (node->left == nullptr || node->right == nullptr) {
+            AVLNode* temp = node->left ? node->left : node->right;//temp指向非空的子树或者nullptr(左右都空)
+            
+            if (temp == nullptr) {
+                temp = node;
+                node = nullptr;
+            } else {
+                *node = *temp;//用非空的子树替换要删除的节点
+            }
+            delete temp;
+        } else {//左右子树都非空,选择右子树的最小值替换
+            AVLNode* temp = node->right;
+            while (temp->left != nullptr) {
+                temp = temp->left;
+            }
+            node->value = temp->value;
+            node->right = remove(node->right, temp->value);
+            //左右子树都非空,选择左子树的最大值替换
+            // AVLNode* temp = node->left;
+            // while (temp->right != nullptr) {
+            //     temp = temp->right;
+            // }
+            // node->value = temp->value;
+            // node->left = remove(node->left, temp->value);
+        }
+    }
+    
+    if (node == nullptr) return nullptr;
+    
+    node->height = 1 + std::max(height(node->left), height(node->right));//更新高度,检查是否存在失衡
+    
+    int balance = getBalance(node);
+    
+    // 左左情况
+    if (balance > 1 && getBalance(node->left) >= 0) {
+        return rightRotate(node);
+    }
+    
+    // 左右情况
+    if (balance > 1 && getBalance(node->left) < 0) {
+        node->left = leftRotate(node->left);
+        return rightRotate(node);
+    }
+    
+    // 右右情况
+    if (balance < -1 && getBalance(node->right) <= 0) {
+        return leftRotate(node);
+    }
+    
+    // 右左情况
+    if (balance < -1 && getBalance(node->right) > 0) {
+        node->right = rightRotate(node->right);
+        return leftRotate(node);
+    }
+    
+    return node;
 }
 
 // 红黑树实现
@@ -340,6 +424,7 @@ void RBTree::rightRotate(RBNode* y) {
 }
 
 void RBTree::insert(double value) {
+    //在叶子节点上插入新的红色节点，最后再调整
     RBNode* z = new RBNode(value);
     RBNode* y = nullptr;
     RBNode* x = root;
@@ -371,24 +456,24 @@ void RBTree::insert(double value) {
 }
 
 void RBTree::insertFixup(RBNode* z) {
-    while (z->parent != nullptr && z->parent->isRed) {
-        if (z->parent == z->parent->parent->left) {
-            RBNode* y = z->parent->parent->right;
-            if (y->isRed) {
+    while (z->parent != nullptr && z->parent->isRed) {//下面如果z = z->parent->parent;到了根节点，会跳出调整为黑色；违反不红红则会继续
+        if (z->parent == z->parent->parent->left) {//如果父节点是爷爷的左子树
+            RBNode* y = z->parent->parent->right;//叔叔节点
+            if (y->isRed) {//叔叔是红色节点，则父、叔、爷变色
                 z->parent->isRed = false;
                 y->isRed = false;
                 z->parent->parent->isRed = true;
-                z = z->parent->parent;
-            } else {
-                if (z == z->parent->right) {
+                z = z->parent->parent;//爷爷变插入节点，只有这个地方会向上调整，一直循环！！！！！！
+            } else {//叔叔是黑色节点或者空节点，即黑色节点
+                if (z == z->parent->right) {//LR情况，先左旋转
                     z = z->parent;
                     leftRotate(z);
                 }
                 z->parent->isRed = false;
                 z->parent->parent->isRed = true;
-                rightRotate(z->parent->parent);
+                rightRotate(z->parent->parent);//爷爷作为旋转点右旋
             }
-        } else {
+        } else {//如果父节点是爷爷的右子树，同理反过来判断和处理
             RBNode* y = z->parent->parent->left;
             if (y->isRed) {
                 z->parent->isRed = false;
@@ -406,7 +491,7 @@ void RBTree::insertFixup(RBNode* z) {
             }
         }
     }
-    root->isRed = false;
+    root->isRed = false;//如果根节点是红色，变为黑色
 }
 
 bool RBTree::search(double value) {
@@ -432,6 +517,120 @@ void RBTree::cleanup(RBNode* node) {
     }
 }
 
+// 红黑树删除实现
+void RBTree::remove(double value) {
+    RBNode* z = search(root, value);
+    if (z == NIL) return;
+    
+    RBNode* y = z;
+    RBNode* x;
+    bool yOriginalColor = y->isRed;
+    
+    if (z->left == NIL) {
+        x = z->right;
+        transplant(z, z->right);
+    } else if (z->right == NIL) {
+        x = z->left;
+        transplant(z, z->left);
+    } else {
+        y = minimum(z->right);
+        yOriginalColor = y->isRed;
+        x = y->right;
+        
+        if (y->parent == z) {
+            x->parent = y;
+        } else {
+            transplant(y, y->right);
+            y->right = z->right;
+            y->right->parent = y;
+        }
+        
+        transplant(z, y);
+        y->left = z->left;
+        y->left->parent = y;
+        y->isRed = z->isRed;
+    }
+    
+    if (!yOriginalColor) {
+        deleteFixup(x);
+    }
+    
+    delete z;
+}
+
+void RBTree::transplant(RBNode* u, RBNode* v) {
+    if (u->parent == nullptr) {
+        root = v;
+    } else if (u == u->parent->left) {
+        u->parent->left = v;
+    } else {
+        u->parent->right = v;
+    }
+    v->parent = u->parent;
+}
+
+RBNode* RBTree::minimum(RBNode* node) {
+    while (node->left != NIL) {
+        node = node->left;
+    }
+    return node;
+}
+
+void RBTree::deleteFixup(RBNode* x) {
+    while (x != root && !x->isRed) {
+        if (x == x->parent->left) {
+            RBNode* w = x->parent->right;
+            if (w->isRed) {
+                w->isRed = false;
+                x->parent->isRed = true;
+                leftRotate(x->parent);
+                w = x->parent->right;
+            }
+            if (!w->left->isRed && !w->right->isRed) {
+                w->isRed = true;
+                x = x->parent;
+            } else {
+                if (!w->right->isRed) {
+                    w->left->isRed = false;
+                    w->isRed = true;
+                    rightRotate(w);
+                    w = x->parent->right;
+                }
+                w->isRed = x->parent->isRed;
+                x->parent->isRed = false;
+                w->right->isRed = false;
+                leftRotate(x->parent);
+                x = root;
+            }
+        } else {
+            RBNode* w = x->parent->left;
+            if (w->isRed) {
+                w->isRed = false;
+                x->parent->isRed = true;
+                rightRotate(x->parent);
+                w = x->parent->left;
+            }
+            if (!w->right->isRed && !w->left->isRed) {
+                w->isRed = true;
+                x = x->parent;
+            } else {
+                if (!w->left->isRed) {
+                    w->right->isRed = false;
+                    w->isRed = true;
+                    leftRotate(w);
+                    w = x->parent->left;
+                }
+                w->isRed = x->parent->isRed;
+                x->parent->isRed = false;
+                w->left->isRed = false;
+                rightRotate(x->parent);
+                x = root;
+            }
+        }
+    }
+    x->isRed = false;
+}
+
 // B树实现
 void BTree::insert(double value) {
     if (root == nullptr) {
@@ -440,36 +639,47 @@ void BTree::insert(double value) {
         return;
     }
     
-    if (root->keys.size() == 2 * t - 1) {
+    // 如果根节点已满，需要分裂
+    if (root->keys.size() == M - 1) {//如果插入就变成M溢出了
         BTreeNode* newRoot = new BTreeNode(false);
         newRoot->children.push_back(root);
-        splitChild(newRoot, 0);
+        // 分裂原根节点(现在位于newRoot->children[0])
+        splitChild(newRoot, 0);//根节点第一次是0
         root = newRoot;
     }
-    
     insertNonFull(root, value);
 }
 
 void BTree::splitChild(BTreeNode* x, int i) {
-    BTreeNode* y = x->children[i];
-    BTreeNode* z = new BTreeNode(y->isLeaf);
+    BTreeNode* y = x->children[i];  // 获取要分裂的子节点y
+    BTreeNode* z = new BTreeNode(y->isLeaf); // 创建新节点z
     
-    for (int j = 0; j < t - 1; j++) {
-        z->keys.push_back(y->keys[j + t]);
+    int mid = (M - 1) / 2;  // 计算中间位置
+    
+    // 1. 将y的后半部分键转移到z
+    for (int j = mid + 1; j < y->keys.size(); j++) {
+        z->keys.push_back(y->keys[j]); // 复制y的后半部分键
     }
     
+    // 2. 如果y不是叶子节点，还需转移子节点指针
     if (!y->isLeaf) {
-        for (int j = 0; j < t; j++) {
-            z->children.push_back(y->children[j + t]);
+        for (int j = mid + 1; j < y->children.size(); j++) {
+            z->children.push_back(y->children[j]); // 复制y的后半部分子节点
         }
     }
     
-    x->keys.insert(x->keys.begin() + i, y->keys[t - 1]);
+    // 3. 将y的中间键(mid索引)提升到父节点x
+    x->keys.insert(x->keys.begin() + i, y->keys[mid]);
+    
+    // 4. 将新节点z插入父节点x的子节点列表(i+1位置)
+    //前半部分的位置不用改，仍然是父节点x的子节点列表的i位置处
     x->children.insert(x->children.begin() + i + 1, z);
     
-    y->keys.resize(t - 1);
+    // 5. 调整y的大小，保留前mid个键
+    y->keys.resize(mid);
+    // 如果是内部节点，保留前mid+1个子节点
     if (!y->isLeaf) {
-        y->children.resize(t);
+        y->children.resize(mid + 1);
     }
 }
 
@@ -477,23 +687,26 @@ void BTree::insertNonFull(BTreeNode* x, double k) {
     int i = x->keys.size() - 1;
     
     if (x->isLeaf) {
+        // 在叶子节点中插入键
         while (i >= 0 && k < x->keys[i]) {
             i--;
         }
         x->keys.insert(x->keys.begin() + i + 1, k);
     } else {
+        // 找到合适的子节点对应的i，即位置
         while (i >= 0 && k < x->keys[i]) {
             i--;
         }
         i++;
         
-        if (x->children[i]->keys.size() == 2 * t - 1) {
+        // 检查子节点是否需要分裂
+        if (x->children[i]->keys.size() == M - 1) {//如果插入就变成M溢出了
             splitChild(x, i);
             if (k > x->keys[i]) {
-                i++;
+                i++;//分裂之后会提上来一个新的子节点，插入值位置要变成i+1
             }
         }
-        insertNonFull(x->children[i], k);
+        insertNonFull(x->children[i], k);//找到合适的范围子树位置
     }
 }
 
@@ -517,7 +730,7 @@ bool BTree::searchInternal(BTreeNode* x, double k) {
         return false;
     }
     
-    return searchInternal(x->children[i], k);
+    return searchInternal(x->children[i], k);//在当前节点范围内，但没有相等的
 }
 
 void BTree::cleanup(BTreeNode* node) {
@@ -528,5 +741,173 @@ void BTree::cleanup(BTreeNode* node) {
             }
         }
         delete node;
+    }
+}
+
+// B树删除实现
+void BTree::remove(double value) {
+    if (root == nullptr) return;
+    
+    removeInternal(root, value);
+    
+    // 如果根节点变空，需要调整树的高度
+    if (root->keys.empty()) {
+        if (root->isLeaf) {
+            delete root;
+            root = nullptr;
+        } else {
+            BTreeNode* oldRoot = root;
+            root = root->children[0];
+            delete oldRoot;
+        }
+    }
+}
+
+void BTree::removeInternal(BTreeNode* node, double value) {
+    if (node == nullptr) return;
+    
+    int idx = 0;
+    while (idx < node->keys.size() && value > node->keys[idx]) {
+        idx++;
+    }
+    
+    if (idx < node->keys.size() && value == node->keys[idx]) {
+        // 找到要删除的键
+        if (node->isLeaf) {
+            // 如果是叶子节点，直接删除
+            node->keys.erase(node->keys.begin() + idx);
+        } else {
+            // 如果不是叶子节点
+            BTreeNode* leftChild = node->children[idx];
+            BTreeNode* rightChild = node->children[idx + 1];
+            
+            if (leftChild->keys.size() >= (M - 1) / 2) {
+                // 如果左子节点有足够的键，用前驱替换
+                double predecessor = getPredecessor(leftChild);
+                node->keys[idx] = predecessor;
+                removeInternal(leftChild, predecessor);
+            } else if (rightChild->keys.size() >= (M - 1) / 2) {
+                // 如果右子节点有足够的键，用后继替换
+                double successor = getSuccessor(rightChild);
+                node->keys[idx] = successor;
+                removeInternal(rightChild, successor);
+            } else {
+                // 如果左右子节点都没有足够的键，合并它们
+                merge(node, idx);
+                removeInternal(leftChild, value);
+            }
+        }
+    } else {
+        // 键不在当前节点
+        if (node->isLeaf) return;  // 键不存在
+        
+        BTreeNode* child = node->children[idx];
+        bool isLastChild = (idx == node->keys.size());
+        
+        // 确保子节点至少有最小数量的键
+        if (child->keys.size() < (M - 1) / 2) {
+            bool merged = false;
+            
+            // 尝试从左兄弟借
+            if (idx > 0 && node->children[idx - 1]->keys.size() >= (M - 1) / 2) {
+                borrowFromLeft(node, idx);
+            }
+            // 尝试从右兄弟借
+            else if (idx < node->keys.size() && node->children[idx + 1]->keys.size() >= (M - 1) / 2) {
+                borrowFromRight(node, idx);
+            }
+            // 需要合并
+            else {
+                if (idx > 0) {
+                    // 与左兄弟合并
+                    merge(node, idx - 1);
+                    child = node->children[idx - 1];
+                    idx--;
+                } else {
+                    // 与右兄弟合并
+                    merge(node, idx);
+                }
+                merged = true;
+            }
+            
+            // 如果发生了合并且是最后一个子节点，需要调整索引
+            if (merged && isLastChild && idx > 0) {
+                idx--;
+            }
+        }
+        
+        removeInternal(node->children[idx], value);
+    }
+}
+
+double BTree::getPredecessor(BTreeNode* node) {
+    while (!node->isLeaf) {
+        node = node->children.back();
+    }
+    return node->keys.back();
+}
+
+double BTree::getSuccessor(BTreeNode* node) {
+    while (!node->isLeaf) {
+        node = node->children.front();
+    }
+    return node->keys.front();
+}
+
+void BTree::merge(BTreeNode* parent, int idx) {
+    BTreeNode* leftChild = parent->children[idx];
+    BTreeNode* rightChild = parent->children[idx + 1];
+    
+    // 将父节点的键移到左子节点
+    leftChild->keys.push_back(parent->keys[idx]);
+    
+    // 将右子节点的键移到左子节点
+    leftChild->keys.insert(leftChild->keys.end(), rightChild->keys.begin(), rightChild->keys.end());
+    
+    // 如果不是叶子节点，移动子节点
+    if (!leftChild->isLeaf) {
+        leftChild->children.insert(leftChild->children.end(), rightChild->children.begin(), rightChild->children.end());
+    }
+    
+    // 从父节点中删除键和右子节点
+    parent->keys.erase(parent->keys.begin() + idx);
+    parent->children.erase(parent->children.begin() + idx + 1);
+    
+    delete rightChild;
+}
+
+void BTree::borrowFromLeft(BTreeNode* parent, int idx) {
+    BTreeNode* child = parent->children[idx];
+    BTreeNode* leftSibling = parent->children[idx - 1];
+    
+    // 将父节点的键移到子节点
+    child->keys.insert(child->keys.begin(), parent->keys[idx - 1]);
+    
+    // 将左兄弟的最后一个键移到父节点
+    parent->keys[idx - 1] = leftSibling->keys.back();
+    leftSibling->keys.pop_back();
+    
+    // 如果不是叶子节点，移动子节点
+    if (!child->isLeaf) {
+        child->children.insert(child->children.begin(), leftSibling->children.back());
+        leftSibling->children.pop_back();
+    }
+}
+
+void BTree::borrowFromRight(BTreeNode* parent, int idx) {
+    BTreeNode* child = parent->children[idx];
+    BTreeNode* rightSibling = parent->children[idx + 1];
+    
+    // 将父节点的键移到子节点
+    child->keys.push_back(parent->keys[idx]);
+    
+    // 将右兄弟的第一个键移到父节点
+    parent->keys[idx] = rightSibling->keys.front();
+    rightSibling->keys.erase(rightSibling->keys.begin());
+    
+    // 如果不是叶子节点，移动子节点
+    if (!child->isLeaf) {
+        child->children.push_back(rightSibling->children.front());
+        rightSibling->children.erase(rightSibling->children.begin());
     }
 }

@@ -21,9 +21,10 @@
 
 ## 实验环境
 - 操作系统：Windows 10
-- 编译器：g++ 8.1.0
-- CPU：Intel Core i7
-- 内存：16GB
+- 编译器：g++ gcc
+  ![version](../version.png)
+- CPU：r5 5600
+- 内存：32GB
 
 ## 数据结构设计
 
