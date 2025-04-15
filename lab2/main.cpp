@@ -117,11 +117,12 @@ void printBTree(BTreeNode* root, std::string prefix = "", bool isLast = true) {
 
 // 测试树的功能，插入，搜索，删除
 void testTreeFunction(int dataSize) {
-    vector<double> data = {1, 5, 7, 4, 16, 35, 24, 42, 21, 17, 18};
+    // vector<double> data = {1, 5, 7, 4, 16, 35, 24, 42, 21, 17, 18};
+    vector<double> data = generateRandomData(10);
     BSTree bst;
     AVLTree avl;
     RBTree rb;
-    BTree btree(4);  // 创建一个5阶B树，每个节点最多4个键，最少2个键
+    BTree btree(5);  // 创建一个5阶B树，每个节点最多4个键，最少2个键
     
     cout << "\n=== 测试数据 ===" << endl;
     for (double value : data) {

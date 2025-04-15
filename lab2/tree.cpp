@@ -184,6 +184,7 @@ BSTNode* BSTree::remove(BSTNode* node, double value) {
             delete node;
             return temp;
         }
+        //直接前驱或者直接后继
         //找到右子树中的最小值
         BSTNode* temp = node->right;
         while (temp->left != nullptr) {
@@ -517,58 +518,63 @@ void RBTree::cleanup(RBNode* node) {
     }
 }
 
-// 红黑树删除实现
 void RBTree::remove(double value) {
+    // 查找要删除的节点
     RBNode* z = search(root, value);
-    if (z == NIL) return;
+    if (z == NIL) return; // 节点不存在，直接返回
     
-    RBNode* y = z;
-    RBNode* x;
-    bool yOriginalColor = y->isRed;
+    RBNode* y = z; // y 指向将要被删除或移动的节点
+    RBNode* x;     // x 记录 y 原来的位置，用于后续调整
+    bool yOriginalColor = y->isRed; // 保存 y 的原始颜色
     
-    if (z->left == NIL) {
+    // 处理三种情况：z 无左子、无右子、有双子节点
+    if (z->left == NIL) {          // 情况1：z 无左子节点
         x = z->right;
-        transplant(z, z->right);
-    } else if (z->right == NIL) {
+        transplant(z, z->right);   // 用右子替换 z
+    } else if (z->right == NIL) {  // 情况2：z 无右子节点
         x = z->left;
-        transplant(z, z->left);
-    } else {
-        y = minimum(z->right);
-        yOriginalColor = y->isRed;
-        x = y->right;
+        transplant(z, z->left);    // 用左子替换 z
+    } else {                       // 情况3：z 有双子节点
+        y = minimum(z->right);      // 找到 z 的后继节点 y（右子树的最小节点）
+        yOriginalColor = y->isRed;  // 更新为 y 的原始颜色
+        x = y->right;               // x 指向 y 的右子（可能是 NIL）
         
-        if (y->parent == z) {
-            x->parent = y;
-        } else {
-            transplant(y, y->right);
-            y->right = z->right;
+        // 处理 y 的父节点关系
+        if (y->parent == z) {       // 情况3a：y 是 z 的直接右子
+            x->parent = y;          // 确保 x 的父节点正确（即使 x 是 NIL）
+        } else {                    // 情况3b：y 不是 z 的直接右子
+            transplant(y, y->right);// 用 y 的右子替换 y
+            y->right = z->right;    // 将 z 的右子树接到 y
             y->right->parent = y;
         }
         
-        transplant(z, y);
-        y->left = z->left;
+        transplant(z, y);           // 用 y 替换 z
+        y->left = z->left;          // 将 z 的左子树接到 y
         y->left->parent = y;
-        y->isRed = z->isRed;
+        y->isRed = z->isRed;        // 继承 z 的颜色
     }
     
+    // 如果被删除的节点 y 是黑色，需要调整红黑树性质
     if (!yOriginalColor) {
-        deleteFixup(x);
+        deleteFixup(x); // 从 x 开始修复
     }
     
-    delete z;
+    delete z; // 释放节点内存
 }
 
+// 用节点 v 替换节点 u 的位置（仅处理父子关系，不处理子节点）
 void RBTree::transplant(RBNode* u, RBNode* v) {
-    if (u->parent == nullptr) {
+    if (u->parent == nullptr) {     // u 是根节点
         root = v;
-    } else if (u == u->parent->left) {
+    } else if (u == u->parent->left) { // u 是左子节点
         u->parent->left = v;
-    } else {
+    } else {                        // u 是右子节点
         u->parent->right = v;
     }
-    v->parent = u->parent;
+    v->parent = u->parent;          // 更新 v 的父节点
 }
 
+// 找到以 node 为根的子树的最小节点（最左子节点）
 RBNode* RBTree::minimum(RBNode* node) {
     while (node->left != NIL) {
         node = node->left;
@@ -576,33 +582,37 @@ RBNode* RBTree::minimum(RBNode* node) {
     return node;
 }
 
+// 修复删除后的红黑树性质
 void RBTree::deleteFixup(RBNode* x) {
+    // 循环处理直到 x 是根或变为红色
     while (x != root && !x->isRed) {
-        if (x == x->parent->left) {
-            RBNode* w = x->parent->right;
-            if (w->isRed) {
-                w->isRed = false;
-                x->parent->isRed = true;
-                leftRotate(x->parent);
-                w = x->parent->right;
+        if (x == x->parent->left) { // x 是左子节点
+            RBNode* w = x->parent->right; // 兄弟节点
+            if (w->isRed) {         // 情况1：兄弟是红色
+                w->isRed = false;   // 兄弟变黑
+                x->parent->isRed = true; // 父变红
+                leftRotate(x->parent);  // 左旋父节点，转化为兄弟为黑的情况
+                w = x->parent->right; // 更新兄弟节点
             }
-            if (!w->left->isRed && !w->right->isRed) {
-                w->isRed = true;
-                x = x->parent;
+            // 兄弟节点为黑色时的处理
+            if (!w->left->isRed && !w->right->isRed) { // 情况2：兄弟的两个子都是黑色
+                w->isRed = true;    // 兄弟变红
+                x = x->parent;      // 将 x 上移，继续循环处理父节点
             } else {
-                if (!w->right->isRed) {
-                    w->left->isRed = false;
-                    w->isRed = true;
-                    rightRotate(w);
-                    w = x->parent->right;
+                if (!w->right->isRed) { // 情况3：兄弟的右子是黑色（左子为红）
+                    w->left->isRed = false; // 左子变黑
+                    w->isRed = true;    // 兄弟变红
+                    rightRotate(w);     // 右旋兄弟节点，转化为情况4
+                    w = x->parent->right; // 更新兄弟节点
                 }
-                w->isRed = x->parent->isRed;
-                x->parent->isRed = false;
-                w->right->isRed = false;
-                leftRotate(x->parent);
-                x = root;
+                // 情况4：兄弟的右子是红色
+                w->isRed = x->parent->isRed; // 兄弟颜色继承父节点颜色
+                x->parent->isRed = false;    // 父节点变黑
+                w->right->isRed = false;     // 兄弟右子变黑
+                leftRotate(x->parent);       // 左旋父节点
+                x = root;                    // 结束循环（x 设为根）
             }
-        } else {
+        } else { // 对称处理：x 是右子节点
             RBNode* w = x->parent->left;
             if (w->isRed) {
                 w->isRed = false;
@@ -628,7 +638,7 @@ void RBTree::deleteFixup(RBNode* x) {
             }
         }
     }
-    x->isRed = false;
+    x->isRed = false; // 确保根节点为黑色
 }
 
 // B树实现
