@@ -7,7 +7,7 @@ class MaxBackpackValue:
         self.values = values
         self.capacity = capacity
         self.n = len(weights)
-        self.max_time = 60  # 设置最大运行时间为60秒
+        self.max_time = 30  # 设置最大运行时间为60秒
         self.selected_items = []  # 记录选择的物品
 
     def divide_and_conquer(self) -> Tuple[int, float, List[int]]:
@@ -160,7 +160,7 @@ class MaxBackpackValue:
                 level += 1
             
             if level < self.n:
-                value_bound += (self.capacity - weight) * (self.values[level] / self.weights[level])
+                value_bound += (self.capacity - weight) * (self.values[level] / self.weights[level])#分数背包思想
             
             return value_bound
 

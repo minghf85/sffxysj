@@ -505,6 +505,206 @@ return total_value, time.perf_counter() - start_time, sorted(selected_items)
 
 这段代码展示了贪心算法在0-1背包问题中的典型应用，虽然不能保证最优解，但在很多实际应用中，由于其高效性，仍然是一个实用的选择。
 
+## 回溯法求解0-1背包问题代码详解
+
+这段代码使用回溯法(Backtracking)来解决0-1背包问题。回溯法是一种通过递归尝试所有可能解并剪枝来寻找最优解的方法。
+
+1. 回溯法思想概述
+
+回溯法的核心思想是：
+• 系统地搜索问题的所有可能解
+
+• 通过递归探索解空间
+
+• 利用剪枝函数避免无效搜索
+
+• 记录当前找到的最优解
+
+
+对于0-1背包问题，回溯法会：
+1. 考虑每个物品的选与不选两种选择
+2. 递归探索这两种选择
+3. 当背包超重时剪枝（停止继续探索该路径）
+4. 记录找到的最大价值解
+
+2. 代码结构详解
+
+2.1 方法定义和初始化
+
+```python
+def backtracking(self) -> Tuple[int, float, List[int]]:
+    """回溯法求解0-1背包问题"""
+    start_time = time.perf_counter()
+    self.max_value = 0  # 记录最大价值
+    self.best_selection = []  # 记录最优选择方案
+    current_selection = []  # 当前选择方案
+```
+
+• 返回元组：(最大价值, 计算时间, 选择的物品索引列表)
+
+• `start_time`记录开始时间
+
+• `max_value`记录当前找到的最大价值
+
+• `best_selection`记录最优解的选择方案
+
+• `current_selection`记录当前递归路径的选择方案
+
+
+2.2 回溯函数定义
+
+```python
+def backtrack(i: int, current_weight: int, current_value: int, selected: List[int]):
+```
+
+参数说明：
+• `i`: 当前考虑的物品索引(从0到n-1)
+
+• `current_weight`: 当前已选物品的总重量
+
+• `current_value`: 当前已选物品的总价值
+
+• `selected`: 当前已选物品的索引列表
+
+
+终止条件
+
+```python
+if time.perf_counter() - start_time > self.max_time:
+    return
+if i == self.n:
+    if current_value > self.max_value:
+        self.max_value = current_value
+        self.best_selection = selected.copy()
+    return
+```
+
+1. 超时检查：超过最大允许时间则返回
+2. 递归终止条件：已考虑所有物品(i == self.n)
+   • 如果当前解优于已知最优解，更新最优解
+
+   • 使用`copy()`防止列表被后续修改影响
+
+
+选择当前物品
+
+```python
+if current_weight + self.weights[i] <= self.capacity:
+    selected.append(i)
+    backtrack(i + 1, current_weight + self.weights[i], 
+             current_value + self.values[i], selected)
+    selected.pop()
+```
+
+1. 检查选择当前物品是否超重
+2. 如果不超重：
+   • 将当前物品加入选择列表
+
+   • 递归考虑下一个物品
+
+   • 回溯：从选择列表中移除当前物品(`pop()`)
+
+
+不选择当前物品
+
+```python
+backtrack(i + 1, current_weight, current_value, selected)
+```
+
+直接递归考虑不选择当前物品的情况
+
+2.3 启动回溯和返回结果
+
+```python
+backtrack(0, 0, 0, current_selection)
+return self.max_value, time.perf_counter() - start_time, self.best_selection
+```
+
+1. 从第0个物品开始回溯
+2. 初始状态：重量0，价值0，空选择列表
+3. 返回最优解和计算时间
+
+3. 算法分析
+
+3.1 时间复杂度
+
+• 最坏情况：O(2^n)，需要探索所有可能的子集
+
+• 平均情况：取决于剪枝效果，通常好于最坏情况
+
+
+3.2 空间复杂度
+
+• 递归栈：O(n)，递归深度最多为n
+
+• 存储选择列表：O(n)
+
+• 总空间复杂度：O(n)
+
+
+3.3 优点
+
+1. 能够找到精确的最优解
+2. 实现相对简单直观
+3. 通过剪枝可以减少搜索空间
+
+3.4 局限性
+
+1. 时间复杂度高，不适合大规模问题
+2. 没有利用重叠子问题的特性（动态规划更高效）
+
+4. 执行过程示例
+
+假设输入：
+• 容量capacity=5
+
+• 物品：
+
+  • 物品0：重量=2，价值=3
+
+  • 物品1：重量=3，价值=4
+
+  • 物品2：重量=4，价值=5
+
+
+递归树简化表示：
+```
+开始
+├─ 选0 (w=2,v=3)
+│  ├─ 选1 (w=5,v=7) → 最优解
+│  └─ 不选1
+│     └─ 选2 (w=6) → 超重剪枝
+└─ 不选0
+   ├─ 选1 (w=3,v=4)
+   │  └─ 选2 (w=7) → 超重剪枝
+   └─ 不选1
+      └─ 选2 (w=4,v=5)
+```
+
+最终找到最优解：选择物品0和1，总价值7
+
+5. 优化方向
+
+1. 剪枝优化：
+   • 计算剩余物品的最大可能价值，如果当前价值加上剩余最大价值仍小于已知最优解，则剪枝
+
+   • 提前对物品按性价比排序，提高剪枝效率
+
+
+2. 记忆化：
+   • 存储已计算的状态，避免重复计算
+
+
+3. 迭代实现：
+   • 使用栈模拟递归，避免递归深度过大
+
+
+4. 结合贪心：
+   • 先用贪心算法得到一个较好的解，帮助更快剪枝
+
+
+这段代码展示了回溯法解决0-1背包问题的经典实现，虽然时间复杂度较高，但对于理解递归和回溯思想非常有帮助。
+
 ## 分支限界法求解0-1背包问题代码详解
 
 这段代码使用分支限界法(Branch and Bound)来解决0-1背包问题。分支限界法是一种智能化的穷举搜索算法，通过系统地搜索解空间并结合剪枝策略来提高效率。

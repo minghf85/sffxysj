@@ -4,7 +4,7 @@ from typing import List, Tuple
 
 def generate_test_data(n: int) -> tuple:
     """生成测试数据"""
-    random.seed(40)  # 固定随机种子以便复现结果
+    random.seed(25)  # 固定随机种子以便复现结果
     weights = [random.randint(1, 100) for _ in range(n)]
     values = [random.randint(1, 100) for _ in range(n)]
     capacity = sum(weights) // 3  # 设置背包容量为总重量的1/3
@@ -76,13 +76,13 @@ def test_scale(n: int) -> None:
 
 def main():
     # 测试不同规模的数据
-    print("\n小规模测试 (n=10):")
+    print("\nn=10:")
     test_scale(10)
     
-    print("\n中等规模测试 (n=50):")
+    print("\nn=50:")
     test_scale(50)
     
-    print("\n大规模测试 (n=200):")
+    print("\nn=200:")
     test_scale(200)
 
 if __name__ == "__main__":
