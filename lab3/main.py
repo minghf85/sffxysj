@@ -4,7 +4,7 @@ from typing import List, Tuple
 
 def generate_test_data(n: int) -> tuple:
     """生成测试数据"""
-    random.seed(42)  # 固定随机种子以便复现结果
+    random.seed(40)  # 固定随机种子以便复现结果
     weights = [random.randint(1, 100) for _ in range(n)]
     values = [random.randint(1, 100) for _ in range(n)]
     capacity = sum(weights) // 3  # 设置背包容量为总重量的1/3
