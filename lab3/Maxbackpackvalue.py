@@ -15,6 +15,7 @@ class MaxBackpackValue:
         Returns:
             tuple: (最优值, 计算时间, 选择的物品列表)
         """
+        #初始化
         start_time = time.perf_counter()
         self.selected_items = [0] * self.n
         self.best_value = 0
@@ -23,7 +24,7 @@ class MaxBackpackValue:
         def solve(i: int, c: int, current_selection: List[int]) -> int:
             if time.perf_counter() - start_time > self.max_time:
                 return -1
-            if i == 0 or c == 0:
+            if i == 0 or c == 0:#递归终止条件
                 current_value = sum(v * s for v, s in zip(self.values, current_selection))
                 if current_value > self.best_value:
                     self.best_value = current_value
